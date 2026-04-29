@@ -26,8 +26,47 @@
 </head>
 <body>
   <div id="lyric-block">
-    <div id="line1">Line one will appear here</div>
-    <div id="line2">Line two will appear here</div>
+    <div id="line1"></div>
+    <div id="line2"></div>
   </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://vzxfcydeqapjcnuakgib.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6eGZjeWRlcWFwamNudWFrZ2liIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTM3NjAsImV4cCI6MjA5Mjg4OTc2MH0.ZYvflsej6MVDOQswT-ZVLWjXhauZqWRThttPf8DfxEE';
+
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function renderState(row) {
+      document.getElementById('line1').textContent = row.line1 || '';
+      document.getElementById('line2').textContent = row.line2 || '';
+    }
+
+    async function init() {
+      // Load current state immediately
+      const { data, error } = await client
+        .from('live')
+        .select('*')
+        .eq('id', 1)
+        .single();
+
+      if (error) { console.error('Load error:', error); return; }
+      renderState(data);
+
+      // Subscribe to realtime changes
+      client
+        .channel('live-channel')
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'live'
+        }, payload => {
+          renderState(payload.new);
+        })
+        .subscribe();
+    }
+
+    init();
+  </script>
 </body>
 </html>

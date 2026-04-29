@@ -32,13 +32,30 @@
   <button onclick="pushLyrics()">Push to Overlay</button>
   <div id="status">Ready.</div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    function pushLyrics() {
+    const SUPABASE_URL = 'https://vzxfcydeqapjcnuakgib.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6eGZjeWRlcWFwamNudWFrZ2liIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTM3NjAsImV4cCI6MjA5Mjg4OTc2MH0.ZYvflsej6MVDOQswT-ZVLWjXhauZqWRThttPf8DfxEE';
+
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    async function pushLyrics() {
       const line1 = document.getElementById('line1').value;
       const line2 = document.getElementById('line2').value;
-      // Phase 1: just log to console — database comes in Phase 2
-      console.log('Pushing:', line1, line2);
-      document.getElementById('status').textContent = `Pushed: "${line1}" / "${line2}"`;
+
+      document.getElementById('status').textContent = 'Pushing...';
+
+      const { error } = await client
+        .from('live')
+        .update({ line1, line2, updated_at: new Date().toISOString() })
+        .eq('id', 1);
+
+      if (error) {
+        console.error('Push error:', error);
+        document.getElementById('status').textContent = 'Error: ' + error.message;
+      } else {
+        document.getElementById('status').textContent = `Pushed at ${new Date().toLocaleTimeString()}`;
+      }
     }
   </script>
 </body>
