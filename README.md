@@ -1,2 +1,2 @@
 # calvaryhephzibah-control-room
-A recreation with updates of the Calvary Hephzibah Full Gospel Church Control Room implementation
+This is a step-by-step recreation of the Calvary Hephzibah admin control room project via use of AI Programming (Claude + Supabase)
