@@ -4,59 +4,125 @@
   <meta charset="UTF-8" />
   <title>Control Room — Operator</title>
   <style>
-    body { font-family: Arial, sans-serif; background: #111; color: #eee; padding: 40px; }
-    h1 { margin-bottom: 24px; }
-    label { display: block; margin-top: 16px; font-size: 14px; opacity: 0.7; }
-    input[type="text"] {
-      display: block; width: 100%; max-width: 600px;
-      padding: 10px; margin-top: 6px;
-      font-size: 18px; background: #222; color: white;
-      border: 1px solid #444; border-radius: 4px;
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #111; color: #eee; padding: 30px; margin: 0; }
+    h1 { margin-bottom: 24px; font-size: 22px; }
+
+    #song-tabs { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+    .tab-btn {
+      padding: 10px 20px; background: #222; color: #aaa;
+      border: 1px solid #444; border-radius: 4px; cursor: pointer; font-size: 14px;
     }
-    button {
-      margin-top: 20px; padding: 12px 32px;
-      font-size: 16px; background: #c0392b; color: white;
-      border: none; border-radius: 4px; cursor: pointer;
+    .tab-btn.active { background: #c0392b; color: white; border-color: #c0392b; }
+
+    #slides-grid { display: flex; flex-direction: column; gap: 10px; max-width: 700px; }
+    .slide-btn {
+      padding: 14px 18px; background: #1a1a1a; color: #ddd;
+      border: 1px solid #333; border-radius: 4px; cursor: pointer;
+      text-align: left; font-size: 15px; line-height: 1.5;
+      transition: background 0.15s;
     }
-    button:hover { background: #e74c3c; }
-    #status { margin-top: 16px; font-size: 14px; opacity: 0.6; }
+    .slide-btn:hover { background: #2a2a2a; border-color: #555; }
+    .slide-btn.active { background: #1e3a2f; border-color: #2ecc71; color: white; }
+    .slide-label { font-size: 11px; color: #666; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
+
+    #clear-btn {
+      margin-top: 24px; padding: 12px 32px;
+      font-size: 15px; background: #333; color: #aaa;
+      border: 1px solid #555; border-radius: 4px; cursor: pointer;
+    }
+    #clear-btn:hover { background: #444; color: white; }
+    #status { margin-top: 14px; font-size: 13px; opacity: 0.5; }
   </style>
 </head>
 <body>
   <h1>Control Room</h1>
-  <label>Line 1</label>
-  <input type="text" id="line1" placeholder="First lyric line" />
-  <label>Line 2</label>
-  <input type="text" id="line2" placeholder="Second lyric line" />
-  <br />
-  <button onclick="pushLyrics()">Push to Overlay</button>
+
+  <div id="song-tabs"></div>
+  <div id="slides-grid"></div>
+  <button id="clear-btn" onclick="clearOverlay()">⬛ Clear Overlay</button>
   <div id="status">Ready.</div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://vzxfcydeqapjcnuakgib.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6eGZjeWRlcWFwamNudWFrZ2liIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTM3NjAsImV4cCI6MjA5Mjg4OTc2MH0.ZYvflsej6MVDOQswT-ZVLWjXhauZqWRThttPf8DfxEE';
-
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    async function pushLyrics() {
-      const line1 = document.getElementById('line1').value;
-      const line2 = document.getElementById('line2').value;
+    const SONGS = [
+      {
+        title: 'Gratitude',
+        slides: [
+          { label: 'Verse 1a', line1: 'All my words fall short', line2: 'I got nothing new' },
+          { label: 'Verse 1b', line1: 'How could I express', line2: 'All my gratitude?' },
+          { label: 'Verse 2a', line1: 'I could sing these songs', line2: 'As I often do' },
+          { label: 'Verse 2b', line1: 'But every song must end', line2: 'And You never do' },
+        ]
+      },
+      {
+        title: 'Goodness of God',
+        slides: [
+          { label: 'Chorus 1a', line1: 'I love You, Lord', line2: 'Oh, Your mercy never failed me' },
+          { label: 'Chorus 1b', line1: 'And all my days, I\'ve been held in Your hands', line2: 'From the moment that I wake up' },
+          { label: 'Chorus 1c', line1: 'Until I lay my head', line2: 'Oh, I will sing of the goodness of God' },
+          { label: 'Chorus 2a', line1: 'All my life You have been faithful', line2: 'All my life You have been so, so good' },
+          { label: 'Chorus 2b', line1: 'With every breath that I am able', line2: 'Oh, I will sing of the goodness of God' },
+        ]
+      }
+    ];
 
-      document.getElementById('status').textContent = 'Pushing...';
+    let activeSongIndex = 0;
+    let activeSlideIndex = null;
 
+    function renderTabs() {
+      const container = document.getElementById('song-tabs');
+      container.innerHTML = '';
+      SONGS.forEach((song, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'tab-btn' + (i === activeSongIndex ? ' active' : '');
+        btn.textContent = song.title;
+        btn.onclick = () => { activeSongIndex = i; activeSlideIndex = null; renderTabs(); renderSlides(); };
+        container.appendChild(btn);
+      });
+    }
+
+    function renderSlides() {
+      const container = document.getElementById('slides-grid');
+      container.innerHTML = '';
+      SONGS[activeSongIndex].slides.forEach((slide, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'slide-btn' + (i === activeSlideIndex ? ' active' : '');
+        btn.innerHTML = `<div class="slide-label">${slide.label}</div>${slide.line1}<br>${slide.line2}`;
+        btn.onclick = () => pushSlide(i);
+        container.appendChild(btn);
+      });
+    }
+
+    async function pushSlide(index) {
+      activeSlideIndex = index;
+      renderSlides();
+      const slide = SONGS[activeSongIndex].slides[index];
       const { error } = await client
         .from('live')
-        .update({ line1, line2, updated_at: new Date().toISOString() })
+        .update({ line1: slide.line1, line2: slide.line2, updated_at: new Date().toISOString() })
         .eq('id', 1);
-
-      if (error) {
-        console.error('Push error:', error);
-        document.getElementById('status').textContent = 'Error: ' + error.message;
-      } else {
-        document.getElementById('status').textContent = `Pushed at ${new Date().toLocaleTimeString()}`;
-      }
+      document.getElementById('status').textContent = error
+        ? 'Error: ' + error.message
+        : `Pushed "${slide.label}" at ${new Date().toLocaleTimeString()}`;
     }
+
+    async function clearOverlay() {
+      activeSlideIndex = null;
+      renderSlides();
+      const { error } = await client
+        .from('live')
+        .update({ line1: '', line2: '', updated_at: new Date().toISOString() })
+        .eq('id', 1);
+      document.getElementById('status').textContent = error ? 'Error: ' + error.message : 'Overlay cleared.';
+    }
+
+    renderTabs();
+    renderSlides();
   </script>
 </body>
 </html>
