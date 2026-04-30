@@ -8,26 +8,49 @@
     body { font-family: Arial, sans-serif; background: #111; color: #eee; padding: 30px; margin: 0; }
     h1 { margin-bottom: 24px; font-size: 22px; }
 
-    #song-tabs { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+    /* Section headers */
+    .section-title {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 2px;
+      color: #666; margin: 32px 0 12px;
+      border-bottom: 1px solid #222; padding-bottom: 6px;
+    }
+
+    /* Song tabs */
+    #song-tabs { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
     .tab-btn {
       padding: 10px 20px; background: #222; color: #aaa;
       border: 1px solid #444; border-radius: 4px; cursor: pointer; font-size: 14px;
     }
     .tab-btn.active { background: #c0392b; color: white; border-color: #c0392b; }
 
+    /* Slide buttons */
     #slides-grid { display: flex; flex-direction: column; gap: 10px; max-width: 700px; }
     .slide-btn {
       padding: 14px 18px; background: #1a1a1a; color: #ddd;
       border: 1px solid #333; border-radius: 4px; cursor: pointer;
       text-align: left; font-size: 15px; line-height: 1.5;
-      transition: background 0.15s;
     }
     .slide-btn:hover { background: #2a2a2a; border-color: #555; }
     .slide-btn.active { background: #1e3a2f; border-color: #2ecc71; color: white; }
     .slide-label { font-size: 11px; color: #666; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
 
+    /* Lower third inputs */
+    .lt-row { display: flex; gap: 10px; max-width: 700px; margin-bottom: 10px; }
+    .lt-row input {
+      flex: 1; padding: 10px; font-size: 16px;
+      background: #222; color: white; border: 1px solid #444; border-radius: 4px;
+    }
+    #push-lt-btn {
+      padding: 12px 28px; font-size: 15px;
+      background: #2471a3; color: white;
+      border: none; border-radius: 4px; cursor: pointer;
+    }
+    #push-lt-btn:hover { background: #2e86c1; }
+    #push-lt-btn.active { background: #1a5276; border: 2px solid #2e86c1; }
+
+    /* Clear button */
     #clear-btn {
-      margin-top: 24px; padding: 12px 32px;
+      margin-top: 28px; padding: 12px 32px;
       font-size: 15px; background: #333; color: #aaa;
       border: 1px solid #555; border-radius: 4px; cursor: pointer;
     }
@@ -38,8 +61,17 @@
 <body>
   <h1>Control Room</h1>
 
+  <div class="section-title">Lyrics</div>
   <div id="song-tabs"></div>
   <div id="slides-grid"></div>
+
+  <div class="section-title">Lower Third</div>
+  <div class="lt-row">
+    <input type="text" id="lt-name" placeholder="Name (e.g. Scott Johnson)" />
+    <input type="text" id="lt-title" placeholder="Title (e.g. Lead Pastor)" />
+  </div>
+  <button id="push-lt-btn" onclick="pushLowerThird()">Show Lower Third</button>
+
   <button id="clear-btn" onclick="clearOverlay()">⬛ Clear Overlay</button>
   <div id="status">Ready.</div>
 
@@ -73,6 +105,7 @@
 
     let activeSongIndex = 0;
     let activeSlideIndex = null;
+    let activeLowerThird = false;
 
     function renderTabs() {
       const container = document.getElementById('song-tabs');
@@ -99,24 +132,48 @@
     }
 
     async function pushSlide(index) {
+      activeSongIndex = activeSongIndex;
       activeSlideIndex = index;
+      activeLowerThird = false;
+      document.getElementById('push-lt-btn').classList.remove('active');
       renderSlides();
       const slide = SONGS[activeSongIndex].slides[index];
       const { error } = await client
         .from('live')
-        .update({ line1: slide.line1, line2: slide.line2, updated_at: new Date().toISOString() })
+        .update({ mode: 'lyrics', line1: slide.line1, line2: slide.line2, updated_at: new Date().toISOString() })
         .eq('id', 1);
       document.getElementById('status').textContent = error
         ? 'Error: ' + error.message
         : `Pushed "${slide.label}" at ${new Date().toLocaleTimeString()}`;
     }
 
-    async function clearOverlay() {
+    async function pushLowerThird() {
+      const name = document.getElementById('lt-name').value.trim();
+      const title = document.getElementById('lt-title').value.trim();
+      if (!name) { document.getElementById('status').textContent = 'Enter a name first.'; return; }
+
+      activeLowerThird = true;
       activeSlideIndex = null;
       renderSlides();
+      document.getElementById('push-lt-btn').classList.add('active');
+
       const { error } = await client
         .from('live')
-        .update({ line1: '', line2: '', updated_at: new Date().toISOString() })
+        .update({ mode: 'lower-third', lower_name: name, lower_title: title, updated_at: new Date().toISOString() })
+        .eq('id', 1);
+      document.getElementById('status').textContent = error
+        ? 'Error: ' + error.message
+        : `Lower third: "${name}" pushed at ${new Date().toLocaleTimeString()}`;
+    }
+
+    async function clearOverlay() {
+      activeLowerThird = false;
+      activeSlideIndex = null;
+      renderSlides();
+      document.getElementById('push-lt-btn').classList.remove('active');
+      const { error } = await client
+        .from('live')
+        .update({ mode: 'lyrics', line1: '', line2: '', updated_at: new Date().toISOString() })
         .eq('id', 1);
       document.getElementById('status').textContent = error ? 'Error: ' + error.message : 'Overlay cleared.';
     }

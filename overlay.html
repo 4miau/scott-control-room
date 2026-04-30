@@ -11,39 +11,87 @@
       font-family: Georgia, serif;
       width: 1920px;
       height: 1080px;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
+      position: relative;
       overflow: hidden;
     }
+
+    /* LYRICS — bottom centre */
     #lyric-block {
+      position: absolute;
+      bottom: 100px;
+      left: 0; right: 0;
       text-align: center;
-      padding: 0 120px 100px;
+      padding: 0 120px;
     }
     #line1 { font-size: 72px; font-weight: bold; line-height: 1.2; }
     #line2 { font-size: 60px; font-weight: normal; line-height: 1.2; margin-top: 12px; opacity: 0.85; }
+
+    /* LOWER THIRD — bottom left */
+    #lower-third {
+      position: absolute;
+      bottom: 80px;
+      left: 80px;
+      display: none;
+    }
+    #lower-bar {
+      background: #c0392b;
+      display: inline-block;
+      padding: 6px 24px 6px 16px;
+      margin-bottom: 8px;
+    }
+    #lower-name {
+      font-family: Arial, sans-serif;
+      font-size: 48px;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+    #lower-title {
+      font-family: Arial, sans-serif;
+      font-size: 32px;
+      font-weight: normal;
+      color: #ccc;
+      padding-left: 4px;
+    }
   </style>
 </head>
 <body>
+
   <div id="lyric-block">
     <div id="line1"></div>
     <div id="line2"></div>
+  </div>
+
+  <div id="lower-third">
+    <div id="lower-bar">
+      <div id="lower-name"></div>
+    </div>
+    <div id="lower-title"></div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = 'https://vzxfcydeqapjcnuakgib.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6eGZjeWRlcWFwamNudWFrZ2liIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTM3NjAsImV4cCI6MjA5Mjg4OTc2MH0.ZYvflsej6MVDOQswT-ZVLWjXhauZqWRThttPf8DfxEE';
-
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     function renderState(row) {
-      document.getElementById('line1').textContent = row.line1 || '';
-      document.getElementById('line2').textContent = row.line2 || '';
+      const lyricBlock = document.getElementById('lyric-block');
+      const lowerThird = document.getElementById('lower-third');
+
+      if (row.mode === 'lower-third') {
+        lyricBlock.style.display = 'none';
+        lowerThird.style.display = 'block';
+        document.getElementById('lower-name').textContent = row.lower_name || '';
+        document.getElementById('lower-title').textContent = row.lower_title || '';
+      } else {
+        lowerThird.style.display = 'none';
+        lyricBlock.style.display = 'block';
+        document.getElementById('line1').textContent = row.line1 || '';
+        document.getElementById('line2').textContent = row.line2 || '';
+      }
     }
 
     async function init() {
-      // Load current state immediately
       const { data, error } = await client
         .from('live')
         .select('*')
@@ -53,7 +101,6 @@
       if (error) { console.error('Load error:', error); return; }
       renderState(data);
 
-      // Subscribe to realtime changes
       client
         .channel('live-channel')
         .on('postgres_changes', {
