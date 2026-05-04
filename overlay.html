@@ -26,6 +26,30 @@
     #line1 { font-size: 72px; font-weight: bold; line-height: 1.2; }
     #line2 { font-size: 60px; font-weight: normal; line-height: 1.2; margin-top: 12px; opacity: 0.85; }
 
+    /* BIBLE VERSE — centre screen */
+    #bible-block {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      padding: 0 160px;
+      display: none;
+    }
+    #bible-text {
+      font-size: 58px;
+      font-style: italic;
+      line-height: 1.4;
+      font-weight: normal;
+    }
+    #bible-ref {
+      font-size: 38px;
+      margin-top: 28px;
+      opacity: 0.7;
+      font-style: normal;
+      font-family: Arial, sans-serif;
+    }
+
     /* LOWER THIRD — bottom left */
     #lower-third {
       position: absolute;
@@ -61,6 +85,11 @@
     <div id="line2"></div>
   </div>
 
+  <div id="bible-block">
+    <div id="bible-text"></div>
+    <div id="bible-ref"></div>
+  </div>
+
   <div id="lower-third">
     <div id="lower-bar">
       <div id="lower-name"></div>
@@ -74,18 +103,24 @@
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6eGZjeWRlcWFwamNudWFrZ2liIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTM3NjAsImV4cCI6MjA5Mjg4OTc2MH0.ZYvflsej6MVDOQswT-ZVLWjXhauZqWRThttPf8DfxEE';
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    function renderState(row) {
-      const lyricBlock = document.getElementById('lyric-block');
-      const lowerThird = document.getElementById('lower-third');
+    function hideAll() {
+      document.getElementById('lyric-block').style.display = 'none';
+      document.getElementById('bible-block').style.display = 'none';
+      document.getElementById('lower-third').style.display = 'none';
+    }
 
+    function renderState(row) {
+      hideAll();
       if (row.mode === 'lower-third') {
-        lyricBlock.style.display = 'none';
-        lowerThird.style.display = 'block';
+        document.getElementById('lower-third').style.display = 'block';
         document.getElementById('lower-name').textContent = row.lower_name || '';
         document.getElementById('lower-title').textContent = row.lower_title || '';
+      } else if (row.mode === 'bible') {
+        document.getElementById('bible-block').style.display = 'block';
+        document.getElementById('bible-text').textContent = row.line1 || '';
+        document.getElementById('bible-ref').textContent = row.line2 || '';
       } else {
-        lowerThird.style.display = 'none';
-        lyricBlock.style.display = 'block';
+        document.getElementById('lyric-block').style.display = 'block';
         document.getElementById('line1').textContent = row.line1 || '';
         document.getElementById('line2').textContent = row.line2 || '';
       }
@@ -97,7 +132,6 @@
         .select('*')
         .eq('id', 1)
         .single();
-
       if (error) { console.error('Load error:', error); return; }
       renderState(data);
 
@@ -107,9 +141,7 @@
           event: 'UPDATE',
           schema: 'public',
           table: 'live'
-        }, payload => {
-          renderState(payload.new);
-        })
+        }, payload => renderState(payload.new))
         .subscribe();
     }
 
