@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bible Importer</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #111; color: #eee; padding: 40px; }
+    button { padding: 12px 28px; font-size: 16px; background: #c0392b; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:disabled { background: #555; cursor: not-allowed; }
+    #log { margin-top: 20px; font-size: 13px; line-height: 1.8; max-height: 500px; overflow-y: auto; }
+    .ok { color: #2ecc71; }
+    .err { color: #e74c3c; }
+  </style>
+</head>
+<body>
+  <h1>KJV Bible Importer</h1>
+  <p>This will load all 66 books of the KJV into your Supabase bible table.<br>Click once and wait — it takes a few minutes.</p>
+  <button id="start-btn" onclick="startImport()">Start Import</button>
+  <div id="log"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://vzxfcydeqapjcnuakgib.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6eGZjeWRlcWFwamNudWFrZ2liIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTM3NjAsImV4cCI6MjA5Mjg4OTc2MH0.ZYvflsej6MVDOQswT-ZVLWjXhauZqWRThttPf8DfxEE';
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const BOOKS = [
+      "Genesis","Exodus","Leviticus","Numbers","Deuteronomy","Joshua","Judges","Ruth",
+      "1Samuel","2Samuel","1Kings","2Kings","1Chronicles","2Chronicles","Ezra","Nehemiah",
+      "Esther","Job","Psalms","Proverbs","Ecclesiastes","SongofSolomon","Isaiah","Jeremiah",
+      "Lamentations","Ezekiel","Daniel","Hosea","Joel","Amos","Obadiah","Jonah","Micah",
+      "Nahum","Habakkuk","Zephaniah","Haggai","Zechariah","Malachi","Matthew","Mark","Luke",
+      "John","Acts","Romans","1Corinthians","2Corinthians","Galatians","Ephesians","Philippians",
+      "Colossians","1Thessalonians","2Thessalonians","1Timothy","2Timothy","Titus","Philemon",
+      "Hebrews","James","1Peter","2Peter","1John","2John","3John","Jude","Revelation"
+    ];
+
+    // Display names for books (with spaces)
+    const BOOK_NAMES = [
+      "Genesis","Exodus","Leviticus","Numbers","Deuteronomy","Joshua","Judges","Ruth",
+      "1 Samuel","2 Samuel","1 Kings","2 Kings","1 Chronicles","2 Chronicles","Ezra","Nehemiah",
+      "Esther","Job","Psalms","Proverbs","Ecclesiastes","Song of Solomon","Isaiah","Jeremiah",
+      "Lamentations","Ezekiel","Daniel","Hosea","Joel","Amos","Obadiah","Jonah","Micah",
+      "Nahum","Habakkuk","Zephaniah","Haggai","Zechariah","Malachi","Matthew","Mark","Luke",
+      "John","Acts","Romans","1 Corinthians","2 Corinthians","Galatians","Ephesians","Philippians",
+      "Colossians","1 Thessalonians","2 Thessalonians","1 Timothy","2 Timothy","Titus","Philemon",
+      "Hebrews","James","1 Peter","2 Peter","1 John","2 John","3 John","Jude","Revelation"
+    ];
+
+    function log(msg, type = '') {
+      const div = document.getElementById('log');
+      div.innerHTML += `<div class="${type}">${msg}</div>`;
+      div.scrollTop = div.scrollHeight;
+    }
+
+    async function startImport() {
+      document.getElementById('start-btn').disabled = true;
+      log('Starting KJV import...');
+
+      for (let b = 0; b < BOOKS.length; b++) {
+        const fileName = BOOKS[b];
+        const displayName = BOOK_NAMES[b];
+        const url = `https://raw.githubusercontent.com/aruljohn/Bible-kjv/master/${fileName}.json`;
+
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+
+          const rows = [];
+          for (const chapter of data.chapters) {
+            for (const v of chapter.verses) {
+              rows.push({
+                book: displayName,
+                chapter: chapter.chapter,
+                verse: v.verse,
+                text: v.text
+              });
+            }
+          }
+
+          // Insert in batches of 200
+          for (let i = 0; i < rows.length; i += 200) {
+            const batch = rows.slice(i, i + 200);
+            const { error } = await client.from('bible').insert(batch);
+            if (error) throw new Error(error.message);
+          }
+
+          log(`✓ ${displayName} (${rows.length} verses)`, 'ok');
+        } catch (err) {
+          log(`✗ ${displayName}: ${err.message}`, 'err');
+        }
+      }
+
+      log('🎉 Import complete!', 'ok');
+      document.getElementById('start-btn').textContent = 'Done';
+    }
+  </script>
+</body>
+</html>
