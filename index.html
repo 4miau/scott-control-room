@@ -6,7 +6,8 @@
   <style>
     * { box-sizing: border-box; }
     body { font-family: Arial, sans-serif; background: #111; color: #eee; padding: 30px; margin: 0; }
-    h1 { margin-bottom: 24px; font-size: 22px; }
+    h1 { margin-bottom: 6px; font-size: 22px; }
+    .subtitle { color: #666; font-size: 13px; margin-bottom: 24px; }
 
     .section-title {
       font-size: 11px; text-transform: uppercase; letter-spacing: 2px;
@@ -21,6 +22,8 @@
       border: 1px solid #444; border-radius: 4px; cursor: pointer; font-size: 14px;
     }
     .tab-btn.active { background: #c0392b; color: white; border-color: #c0392b; }
+
+    #setlist-label { font-size: 13px; color: #666; margin-bottom: 10px; }
 
     /* Slide buttons */
     #slides-grid { display: flex; flex-direction: column; gap: 10px; max-width: 700px; }
@@ -41,8 +44,7 @@
     }
     #bible-search-row button {
       padding: 10px 20px; font-size: 15px;
-      background: #6c3483; color: white;
-      border: none; border-radius: 4px; cursor: pointer;
+      background: #6c3483; color: white; border: none; border-radius: 4px; cursor: pointer;
     }
     #bible-search-row button:hover { background: #7d3c98; }
     #bible-results { max-width: 700px; display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
@@ -63,27 +65,27 @@
       background: #222; color: white; border: 1px solid #444; border-radius: 4px;
     }
     #push-lt-btn {
-      padding: 12px 28px; font-size: 15px;
-      background: #2471a3; color: white;
+      padding: 12px 28px; font-size: 15px; background: #2471a3; color: white;
       border: none; border-radius: 4px; cursor: pointer;
     }
     #push-lt-btn:hover { background: #2e86c1; }
     #push-lt-btn.active { background: #1a5276; border: 2px solid #2e86c1; }
 
-    /* Clear */
     #clear-btn {
-      margin-top: 28px; padding: 12px 32px;
-      font-size: 15px; background: #333; color: #aaa;
-      border: 1px solid #555; border-radius: 4px; cursor: pointer;
+      margin-top: 28px; padding: 12px 32px; font-size: 15px;
+      background: #333; color: #aaa; border: 1px solid #555; border-radius: 4px; cursor: pointer;
     }
     #clear-btn:hover { background: #444; color: white; }
     #status { margin-top: 14px; font-size: 13px; opacity: 0.5; }
+    .no-setlist { color: #555; font-size: 14px; padding: 10px 0; }
   </style>
 </head>
 <body>
   <h1>Control Room</h1>
+  <p class="subtitle">Operator view — <a href="admin.html" style="color:#c0392b;">Go to Admin</a></p>
 
   <div class="section-title">Lyrics</div>
+  <div id="setlist-label">Loading set list...</div>
   <div id="song-tabs"></div>
   <div id="slides-grid"></div>
 
@@ -111,38 +113,56 @@
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6eGZjeWRlcWFwamNudWFrZ2liIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTM3NjAsImV4cCI6MjA5Mjg4OTc2MH0.ZYvflsej6MVDOQswT-ZVLWjXhauZqWRThttPf8DfxEE';
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const SONGS = [
-      {
-        title: 'Gratitude',
-        slides: [
-          { label: 'Verse 1a', line1: 'All my words fall short', line2: 'I got nothing new' },
-          { label: 'Verse 1b', line1: 'How could I express', line2: 'All my gratitude?' },
-          { label: 'Verse 2a', line1: 'I could sing these songs', line2: 'As I often do' },
-          { label: 'Verse 2b', line1: 'But every song must end', line2: 'And You never do' },
-        ]
-      },
-      {
-        title: 'Goodness of God',
-        slides: [
-          { label: 'Chorus 1a', line1: 'I love You, Lord', line2: 'Oh, Your mercy never failed me' },
-          { label: 'Chorus 1b', line1: 'And all my days, I\'ve been held in Your hands', line2: 'From the moment that I wake up' },
-          { label: 'Chorus 1c', line1: 'Until I lay my head', line2: 'Oh, I will sing of the goodness of God' },
-          { label: 'Chorus 2a', line1: 'All my life You have been faithful', line2: 'All my life You have been so, so good' },
-          { label: 'Chorus 2b', line1: 'With every breath that I am able', line2: 'Oh, I will sing of the goodness of God' },
-        ]
-      }
-    ];
-
+    let songs = [];
     let activeSongIndex = 0;
     let activeSlideIndex = null;
     let activeBibleIndex = null;
     let bibleResults = [];
 
-    // ── SONG TABS & SLIDES ──────────────────────────────────────
+    // ── LOAD TODAY'S SET LIST ────────────────────────────────────
+    function getTodaySunday() {
+      const d = new Date();
+      const day = d.getDay();
+      const diff = day === 0 ? 0 : 7 - day;
+      d.setDate(d.getDate() + diff);
+      return d.toISOString().split('T')[0];
+    }
+
+    async function loadSetlist() {
+      const sunday = getTodaySunday();
+      const { data: setlist } = await client.from('setlists')
+        .select('*').eq('service_date', sunday).single();
+
+      if (!setlist || !setlist.song_ids.length) {
+        document.getElementById('setlist-label').textContent = 'No set list found for this Sunday. Go to Admin to create one.';
+        document.getElementById('song-tabs').innerHTML = '';
+        document.getElementById('slides-grid').innerHTML = '';
+        return;
+      }
+
+      // Load songs in set list order
+      const { data: songData } = await client.from('songs')
+        .select('*').in('id', setlist.song_ids);
+
+      // Sort by set list order
+      songs = setlist.song_ids
+        .map(id => songData.find(s => s.id === id))
+        .filter(Boolean);
+
+      const label = setlist.title
+        ? `${setlist.title} — ${sunday}`
+        : `Set list for ${sunday}`;
+      document.getElementById('setlist-label').textContent = label;
+
+      renderTabs();
+      renderSlides();
+    }
+
+    // ── TABS & SLIDES ────────────────────────────────────────────
     function renderTabs() {
       const container = document.getElementById('song-tabs');
       container.innerHTML = '';
-      SONGS.forEach((song, i) => {
+      songs.forEach((song, i) => {
         const btn = document.createElement('button');
         btn.className = 'tab-btn' + (i === activeSongIndex ? ' active' : '');
         btn.textContent = song.title;
@@ -154,7 +174,8 @@
     function renderSlides() {
       const container = document.getElementById('slides-grid');
       container.innerHTML = '';
-      SONGS[activeSongIndex].slides.forEach((slide, i) => {
+      if (!songs.length) return;
+      songs[activeSongIndex].slides.forEach((slide, i) => {
         const btn = document.createElement('button');
         btn.className = 'slide-btn' + (i === activeSlideIndex ? ' active' : '');
         btn.innerHTML = `<div class="slide-label">${slide.label}</div>${slide.line1}<br>${slide.line2}`;
@@ -169,7 +190,7 @@
       renderSlides();
       renderBibleResults();
       document.getElementById('push-lt-btn').classList.remove('active');
-      const slide = SONGS[activeSongIndex].slides[index];
+      const slide = songs[activeSongIndex].slides[index];
       const { error } = await client.from('live')
         .update({ mode: 'lyrics', line1: slide.line1, line2: slide.line2, updated_at: new Date().toISOString() })
         .eq('id', 1);
@@ -178,23 +199,19 @@
         : `Pushed "${slide.label}" at ${new Date().toLocaleTimeString()}`;
     }
 
-    // ── BIBLE SEARCH ────────────────────────────────────────────
+    // ── BIBLE SEARCH ─────────────────────────────────────────────
     async function searchBible() {
       const query = document.getElementById('bible-query').value.trim();
       if (!query) return;
-
       document.getElementById('bible-status').textContent = 'Searching...';
       document.getElementById('bible-results').innerHTML = '';
       bibleResults = [];
       activeBibleIndex = null;
 
-      // Try to parse a reference like "John 3:16" or "1 John 3:16"
       const refMatch = query.match(/^(\d?\s?[a-zA-Z]+(?:\s[a-zA-Z]+)?)\s+(\d+):(\d+)$/);
-
       let data, error;
 
       if (refMatch) {
-        // Direct reference lookup
         const book = refMatch[1].trim();
         const chapter = parseInt(refMatch[2]);
         const verse = parseInt(refMatch[3]);
@@ -205,23 +222,14 @@
           .eq('verse', verse)
           .limit(5));
       } else {
-        // Keyword search
         ({ data, error } = await client.from('bible')
           .select('book, chapter, verse, text')
           .ilike('text', `%${query}%`)
           .limit(12));
       }
 
-      if (error) {
-        document.getElementById('bible-status').textContent = 'Error: ' + error.message;
-        return;
-      }
-
-      if (!data || data.length === 0) {
-        document.getElementById('bible-status').textContent = 'No results found.';
-        return;
-      }
-
+      if (error) { document.getElementById('bible-status').textContent = 'Error: ' + error.message; return; }
+      if (!data || data.length === 0) { document.getElementById('bible-status').textContent = 'No results found.'; return; }
       bibleResults = data;
       document.getElementById('bible-status').textContent = `${data.length} result${data.length > 1 ? 's' : ''} found`;
       renderBibleResults();
@@ -256,7 +264,7 @@
         : `Pushed ${ref} at ${new Date().toLocaleTimeString()}`;
     }
 
-    // ── LOWER THIRD ─────────────────────────────────────────────
+    // ── LOWER THIRD ──────────────────────────────────────────────
     async function pushLowerThird() {
       const name = document.getElementById('lt-name').value.trim();
       const title = document.getElementById('lt-title').value.trim();
@@ -274,7 +282,7 @@
         : `Lower third: "${name}" pushed at ${new Date().toLocaleTimeString()}`;
     }
 
-    // ── CLEAR ───────────────────────────────────────────────────
+    // ── CLEAR ────────────────────────────────────────────────────
     async function clearOverlay() {
       activeSlideIndex = null;
       activeBibleIndex = null;
@@ -287,8 +295,7 @@
       document.getElementById('status').textContent = error ? 'Error: ' + error.message : 'Overlay cleared.';
     }
 
-    renderTabs();
-    renderSlides();
+    loadSetlist();
   </script>
 </body>
 </html>
